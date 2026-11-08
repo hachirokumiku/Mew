@@ -1,6 +1,7 @@
 package com.sharkie.wobblekit;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -24,6 +25,7 @@ public class WobbleView extends View {
     private float previousX, previousY, tiltX, tiltY;
     private Zone selected;
     private boolean resizing;
+    private float strength = 1f, spring = 85f, damping = 12f;
 
     public WobbleView(Context context) {
         super(context);
@@ -47,18 +49,37 @@ public class WobbleView extends View {
         tiltY = y;
     }
 
+    public void loadPhysics(SharedPreferences prefs) {
+        strength = WobbleMath.clamp(prefs.getInt("strength", 100), 0, 300) / 100f;
+        spring = WobbleMath.clamp(prefs.getInt("spring", 85), 20, 180);
+        damping = WobbleMath.clamp(prefs.getInt("damping", 12), 2, 30);
+    }
+
+    public void applyMotion(float x, float y, float dt) {
+        if (editing || picture == null) return;
+        float aspect = (float) picture.getWidth() / picture.getHeight();
+        for (Zone z : zones) {
+            z.vx -= WobbleMath.motionImpulse(x, z.r, strength, dt);
+            z.vy += WobbleMath.motionImpulse(y, z.r, strength, dt) * aspect;
+        }
+    }
+
     public void tick() {
         long now = System.nanoTime();
         float dt = Math.min(.04f, (now - last) / 1e9f);
         last = now;
         float aspect = picture == null ? 1f : (float) picture.getWidth() / picture.getHeight();
+        int steps = Math.max(1, (int) Math.ceil(dt / .01f));
+        float step = dt / steps;
         for (Zone z : zones) {
-            float targetX = editing ? 0 : WobbleMath.targetX(tiltX, z.r);
-            float targetY = editing ? 0 : WobbleMath.targetY(tiltY, z.r, aspect);
-            z.vx = WobbleMath.velocity(z.dx, z.vx, targetX, dt);
-            z.vy = WobbleMath.velocity(z.dy, z.vy, targetY, dt);
-            z.dx += z.vx * dt;
-            z.dy += z.vy * dt;
+            float targetX = editing ? 0 : WobbleMath.targetX(tiltX, z.r, strength);
+            float targetY = editing ? 0 : WobbleMath.targetY(tiltY, z.r, aspect, strength);
+            for (int i = 0; i < steps; i++) {
+                z.vx = WobbleMath.velocity(z.dx, z.vx, targetX, spring, damping, step);
+                z.vy = WobbleMath.velocity(z.dy, z.vy, targetY, spring, damping, step);
+                z.dx += z.vx * step;
+                z.dy += z.vy * step;
+            }
         }
         invalidate();
     }
@@ -151,8 +172,8 @@ public class WobbleView extends View {
                         selected.x = WobbleMath.clamp(selected.x + dx, 0, 1);
                         selected.y = WobbleMath.clamp(selected.y + dy, 0, 1);
                     } else {
-                        selected.vx += dx * 75;
-                        selected.vy += dy * 75;
+                        selected.vx += dx * 75 * strength;
+                        selected.vy += dy * 75 * strength;
                     }
                 }
                 previousX = u;

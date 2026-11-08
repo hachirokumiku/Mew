@@ -30,15 +30,20 @@ final class WobbleMath {
         }
     }
 
-    static float targetX(float tiltX, float radius) {
-        return -clamp(tiltX / GRAVITY, -1, 1) * radius * .35f;
+    static float targetX(float tiltX, float radius, float strength) {
+        return -clamp(tiltX / GRAVITY, -1, 1) * radius * .5f * strength;
     }
 
-    static float targetY(float tiltY, float radius, float widthOverHeight) {
-        return clamp(tiltY / GRAVITY, -1, 1) * radius * .35f * widthOverHeight;
+    static float targetY(float tiltY, float radius, float widthOverHeight, float strength) {
+        return clamp(tiltY / GRAVITY, -1, 1) * radius * .5f * widthOverHeight * strength;
     }
 
-    static float velocity(float position, float velocity, float target, float dt) {
-        return velocity + (85f * (target - position) - 12f * velocity) * dt;
+    static float motionImpulse(float acceleration, float radius, float strength, float dt) {
+        float normalized = clamp(acceleration / GRAVITY, -2, 2);
+        return normalized * radius * 30f * strength * dt;
+    }
+
+    static float velocity(float position, float velocity, float target, float spring, float damping, float dt) {
+        return velocity + (spring * (target - position) - damping * velocity) * dt;
     }
 }

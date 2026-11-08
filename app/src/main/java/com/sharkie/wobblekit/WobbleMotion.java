@@ -14,9 +14,7 @@ final class WobbleMotion implements SensorEventListener {
     private final WindowManager windows;
     private final WobbleView view;
     private boolean listening;
-    private boolean hasSample;
-    private float filteredX, filteredY;
-    private int rotation = -1;
+    private final MotionFilter filter = new MotionFilter();
 
     WobbleMotion(Context context, WobbleView view) {
         sensors = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
@@ -39,25 +37,15 @@ final class WobbleMotion implements SensorEventListener {
     void stop() {
         if (listening) sensors.unregisterListener(this);
         listening = false;
-        hasSample = false;
-        rotation = -1;
+        filter.reset();
         view.setTilt(0, 0);
     }
 
     @Override public void onSensorChanged(SensorEvent event) {
         if (!listening || event.sensor.getType() != Sensor.TYPE_ACCELEROMETER) return;
-        int currentRotation = windows.getDefaultDisplay().getRotation();
-        float[] axes = WobbleMath.screenAxes(event.values[0], event.values[1], currentRotation);
-        if (!hasSample || rotation != currentRotation) {
-            filteredX = axes[0];
-            filteredY = axes[1];
-            hasSample = true;
-            rotation = currentRotation;
-        } else {
-            filteredX += .25f * (axes[0] - filteredX);
-            filteredY += .25f * (axes[1] - filteredY);
-        }
-        view.setTilt(filteredX, filteredY);
+        filter.update(event.values[0], event.values[1], event.timestamp, windows.getDefaultDisplay().getRotation());
+        view.setTilt(filter.gravityX, filter.gravityY);
+        view.applyMotion(filter.linearX, filter.linearY, filter.dt);
     }
 
     @Override public void onAccuracyChanged(Sensor sensor, int accuracy) {}

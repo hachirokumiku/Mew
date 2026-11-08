@@ -17,16 +17,22 @@ public class WobbleWallpaper extends WallpaperService {
         private final Handler handler = new Handler();
         private final WobbleView view = new WobbleView(WobbleWallpaper.this);
         private final WobbleMotion motion = new WobbleMotion(WobbleWallpaper.this, view);
+        private final SharedPreferences preferences = getSharedPreferences("MainActivity", 0);
+        private final SharedPreferences.OnSharedPreferenceChangeListener physicsListener = (prefs, key) -> {
+            if ("strength".equals(key) || "spring".equals(key) || "damping".equals(key)) view.loadPhysics(prefs);
+        };
         private boolean visible;
         private final Runnable draw = this::render;
 
         WEngine() {
             view.editing = false;
+            preferences.registerOnSharedPreferenceChangeListener(physicsListener);
             setTouchEventsEnabled(true);
         }
 
         private void loadSettings() {
-            SharedPreferences prefs = getSharedPreferences("MainActivity", 0);
+            SharedPreferences prefs = preferences;
+            view.loadPhysics(prefs);
             Bitmap bitmap = null;
             if (prefs.getBoolean("hasImage", false)) {
                 bitmap = BitmapFactory.decodeFile(new File(getFilesDir(), MainActivity.IMAGE_FILE).getAbsolutePath());
@@ -81,6 +87,7 @@ public class WobbleWallpaper extends WallpaperService {
             visible = false;
             motion.stop();
             handler.removeCallbacks(draw);
+            preferences.unregisterOnSharedPreferenceChangeListener(physicsListener);
             super.onDestroy();
         }
 
