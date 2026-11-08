@@ -130,6 +130,29 @@ public final class WobbleMathTest {
         for (int i = 0; i < 2000; i++) jelly.step(0, 0, 85, 8, .01f);
         near(jelly.dx, 0);
         near(jelly.meshX(.1f, 0, jelly.weight(.1f, 0)), 0);
+        jelly = new JellyZone(.5f, .5f, .2f);
+        jelly.impulse(.2f, 0);
+        float positivePeak = 0, negativePeak = 0, laterMotion = 0;
+        for (int i = 0; i < 200; i++) {
+            jelly.step(0, 0, 85, 12, .01f);
+            positivePeak = Math.max(positivePeak, jelly.dx);
+            negativePeak = Math.min(negativePeak, jelly.dx);
+            if (i >= 50 && i < 150) laterMotion = Math.max(laterMotion, Math.abs(jelly.dx));
+        }
+        check(positivePeak > .01f, "A modest impulse must visibly move the jelly");
+        check(negativePeak < -.15f * positivePeak, "Default jelly must bounce back with a visible overshoot");
+        check(laterMotion > .1f * positivePeak, "Jelly motion must persist after the initial movement");
+        for (int spring : new int[] {20, 180}) for (int damping : new int[] {2, 30}) {
+            JellyZone extreme = new JellyZone(.5f, .5f, .2f);
+            extreme.impulse(1000, -1000);
+            for (int i = 0; i < 5000; i++) {
+                extreme.step(0, 0, spring, damping, .01f);
+                check(Float.isFinite(extreme.dx) && Float.isFinite(extreme.dy), "Jelly must remain finite");
+                check(Math.hypot(extreme.dx, extreme.dy) <= .13001f, "Jelly displacement must remain bounded");
+            }
+            near(extreme.dx, 0);
+            near(extreme.dy, 0);
+        }
         boolean invalid = false;
         try { JellyZone.parse(".5,.5,NaN"); } catch (IllegalArgumentException ex) { invalid = true; }
         check(invalid, "Non-finite saved zone values must be rejected");

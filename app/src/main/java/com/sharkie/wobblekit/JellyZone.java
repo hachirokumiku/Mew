@@ -61,19 +61,43 @@ final class JellyZone {
     void impulse(float x, float y) {
         vx += x;
         vy += y;
-        float amount = Math.min(.25f, (float) Math.hypot(x, y) / radius() * .15f);
+        float speed = (float) Math.hypot(vx, vy);
+        float limit = radius() * 5f;
+        if (speed > limit) {
+            vx *= limit / speed;
+            vy *= limit / speed;
+        }
+        float amount = Math.min(.35f, (float) Math.hypot(x, y) / radius() * .25f);
         stretchVelocity = WobbleMath.clamp(stretchVelocity + amount, -2f, 2f);
     }
 
     void step(float targetX, float targetY, float spring, float damping, float dt) {
-        vx = WobbleMath.velocity(dx, vx, targetX, spring, damping, dt);
-        vy = WobbleMath.velocity(dy, vy, targetY, spring, damping, dt);
+        float stiffness = spring * .5f;
+        float drag = damping * .45f;
+        float limit = radius() * .65f;
+        float targetLength = (float) Math.hypot(targetX, targetY);
+        if (targetLength > limit) {
+            targetX *= limit / targetLength;
+            targetY *= limit / targetLength;
+        }
+        vx = WobbleMath.velocity(dx, vx, targetX, stiffness, drag, dt);
+        vy = WobbleMath.velocity(dy, vy, targetY, stiffness, drag, dt);
         dx += vx * dt;
         dy += vy * dt;
+        float displacement = (float) Math.hypot(dx, dy);
+        if (displacement > limit) {
+            dx *= limit / displacement;
+            dy *= limit / displacement;
+            float outwardVelocity = (vx * dx + vy * dy) / limit;
+            if (outwardVelocity > 0) {
+                vx -= outwardVelocity * dx / limit;
+                vy -= outwardVelocity * dy / limit;
+            }
+        }
         float speed = (float) Math.hypot(vx, vy) / radius();
-        float stretchTarget = Math.min(.25f, speed * .07f);
+        float stretchTarget = Math.min(.3f, speed * .12f);
         stretchVelocity = WobbleMath.velocity(stretch, stretchVelocity, stretchTarget,
-                spring * .65f, damping * .65f, dt);
+                stiffness * .65f, drag * .8f, dt);
         stretch += stretchVelocity * dt;
         if (stretch > .3f) { stretch = .3f; stretchVelocity = Math.min(0, stretchVelocity); }
         if (stretch < -.3f) { stretch = -.3f; stretchVelocity = Math.max(0, stretchVelocity); }
