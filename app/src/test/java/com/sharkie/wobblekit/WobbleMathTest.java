@@ -21,6 +21,10 @@ public final class WobbleMathTest {
         near(WobbleMath.radius(0), .04f);
         near(WobbleMath.radius(.2f), .2f);
         near(WobbleMath.radius(2), .5f);
+        check(WobbleMath.imageSampleSize(2048, 1024, 2048) == 1, "Small images must not be reduced");
+        check(WobbleMath.imageSampleSize(2049, 2048, 2048) == 2, "Oversized images need downsampling");
+        check(WobbleMath.imageSampleSize(12000, 8000, 2048) == 8, "Large images must fit the texture limit");
+        check(WobbleMath.imageSampleSize(1, Integer.MAX_VALUE, 2048) == 1048576, "Sampling must not overflow");
         near(WobbleMath.handleX(0, .5f), .5f);
         near(WobbleMath.handleX(1, .5f), .5f);
         near(WobbleMath.distance(.5f, .6f, .5f, .5f, 2), .2f);

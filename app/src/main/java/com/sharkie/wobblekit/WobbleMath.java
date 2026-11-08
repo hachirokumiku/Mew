@@ -11,6 +11,15 @@ final class WobbleMath {
         return clamp(value, .04f, .5f);
     }
 
+    static int imageSampleSize(int width, int height, int maximum) {
+        int sample = 1;
+        while (((long) width + sample - 1) / sample > maximum ||
+               ((long) height + sample - 1) / sample > maximum) {
+            sample *= 2;
+        }
+        return sample;
+    }
+
     static float handleX(float centerX, float radius) {
         return centerX <= .5f ? centerX + radius : centerX - radius;
     }

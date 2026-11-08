@@ -16,6 +16,8 @@ public class WobbleView extends View {
     public boolean editing = true;
     private final Paint paint = new Paint(3);
     private final Paint overlay = new Paint(3);
+    private static final int MESH_WIDTH = 80, MESH_HEIGHT = 120;
+    private final float[] vertices = new float[(MESH_WIDTH + 1) * (MESH_HEIGHT + 1) * 2];
     private long last = System.nanoTime();
     private float previousX, previousY, tiltX, tiltY;
     private JellyZone selected;
@@ -27,7 +29,6 @@ public class WobbleView extends View {
 
     public WobbleView(Context context) {
         super(context);
-        setLayerType(View.LAYER_TYPE_SOFTWARE, null);
     }
 
     public void load(Bitmap bitmap) {
@@ -103,8 +104,7 @@ public class WobbleView extends View {
         float scale = Math.min((float) getWidth() / picture.getWidth(), (float) getHeight() / picture.getHeight());
         float iw = picture.getWidth() * scale, ih = picture.getHeight() * scale;
         float ox = (getWidth() - iw) / 2, oy = (getHeight() - ih) / 2;
-        int nx = 80, ny = 120;
-        float[] vertices = new float[(nx + 1) * (ny + 1) * 2];
+        int nx = MESH_WIDTH, ny = MESH_HEIGHT;
         int index = 0;
         for (int y = 0; y <= ny; y++) for (int x = 0; x <= nx; x++) {
             float u = x / (float) nx, v = y / (float) ny;

@@ -2,7 +2,6 @@ package com.sharkie.wobblekit;
 
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.os.Handler;
 import android.service.wallpaper.WallpaperService;
@@ -36,7 +35,7 @@ public class WobbleWallpaper extends WallpaperService {
             view.loadPhysics(prefs);
             Bitmap bitmap = null;
             if (prefs.getBoolean("hasImage", false)) {
-                bitmap = BitmapFactory.decodeFile(new File(getFilesDir(), MainActivity.IMAGE_FILE).getAbsolutePath());
+                bitmap = ImageLoader.load(new File(getFilesDir(), MainActivity.IMAGE_FILE));
                 if (bitmap == null) Log.w("WobbleWallpaper", "Saved image is unreadable");
             }
             view.load(bitmap);
@@ -62,7 +61,7 @@ public class WobbleWallpaper extends WallpaperService {
             if (!visible) return;
             Canvas canvas = null;
             try {
-                canvas = getSurfaceHolder().lockCanvas();
+                canvas = getSurfaceHolder().lockHardwareCanvas();
                 if (canvas != null) {
                     view.layout(0, 0, canvas.getWidth(), canvas.getHeight());
                     view.tick();

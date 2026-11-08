@@ -10,10 +10,11 @@ Open this folder in Android Studio with Android SDK 35, then Build > Build APK(s
 - Toggle between editor and touch- and accelerometer-responsive spring simulation
 - Tune strength, springiness and damping for all zones
 - Soft, bouncy jelly-like stretch and squash with bitmap-mesh deformation
+- Hardware-accelerated mesh drawing in the editor and live wallpaper
 - Live wallpaper service with touch and accelerometer input
 
 ## Known limitations
-Prototype, not yet tested on physical Galaxy S26. Accelerometer input depends on an available sensor; touch interaction still works without one. Gyroscope, multi-touch, exports, GPU shader and polish are future work.
+Prototype, not yet tested on physical Galaxy S26. Accelerometer input depends on an available sensor; touch interaction still works without one. Large images are downsampled to fit a 2048-pixel texture when rendered; the original file is retained. The mesh and physics calculations run on the CPU. Gyroscope, multi-touch, exports and polish are future work.
 
 ## Use
 Choose an image, tap **+ Zone**, then drag a zone to move it or drag its dot to resize it. Select a zone and tap **Shape** to adjust width and height (radii as a percentage of image width), rotation, and smooth, broad or pointed falloff; the same dialog can delete the selected zone. Tap **Play/Edit** and tilt, shake or touch the image to test the jelly motion. **Tune** adjusts strength (0–300%), springiness and damping for all zones; tap **Apply** to save or **Reset** to restore defaults. Tap **Wallpaper** to open the live-wallpaper preview and apply it. Zones, shapes and tuning are saved for the wallpaper.
