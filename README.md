@@ -5,14 +5,17 @@ Clean-room Android wobble wallpaper prototype inspired by vintage AndWobble. No 
 Open this folder in Android Studio with Android SDK 35, then Build > Build APK(s), or run `gradle assembleDebug` with the Android SDK and Gradle available.
 
 ## Features
-- Android image document picker with persisted read permission
-- Place and drag circular wobble regions
-- Toggle between editor and touch-responsive spring simulation
+- Android image picker with an app-private copy for the wallpaper
+- Place and drag circular wobble regions; drag the dot on a region's edge to resize it
+- Toggle between editor and touch- and accelerometer-responsive spring simulation
 - Bitmap-mesh deformation
-- Live wallpaper service with touch events
+- Live wallpaper service with touch and accelerometer input
 
 ## Known limitations
-Prototype, not yet tested on physical Galaxy S26. No compiled APK in this archive because the build environment lacks Android SDK/Gradle and cannot download them. Zone sizes are fixed; gyroscope, multi-touch, exports, GPU shader and polish are future work. Wallpaper image access can vary across document providers; test on device.
+Prototype, not yet tested on physical Galaxy S26. Accelerometer input depends on an available sensor; touch interaction still works without one. Gyroscope, multi-touch, exports, GPU shader and polish are future work.
+
+## Use
+Choose an image, tap **+ Zone**, then drag a zone to move it or drag its dot to resize it. Tap **Play/Edit** and tilt or touch the image to test the wobble. Tap **Wallpaper** to open the live-wallpaper preview and apply it. Zones and their sizes are saved when you leave the editor.
 
 ## Build an APK without Android Studio (GitHub Actions)
 1. Create an empty GitHub repository and upload the **contents** of this `WobbleKit` directory to its root (including `.github/workflows/android.yml`).
@@ -20,4 +23,4 @@ Prototype, not yet tested on physical Galaxy S26. No compiled APK in this archiv
 3. After a successful run, open its **Artifacts** section and download `WobbleKit-S26-debug-APK`.
 4. Extract the ZIP to get `app-debug.apk` and install it on your Android device.
 
-This is an unsigned-for-release but debug-signed APK. GitHub Actions performs the SDK installation on its own runner. Builds have not yet been verified on a GitHub runner or a Galaxy S26.
+This is a debug-signed APK, not a release build. GitHub Actions performs the SDK installation on its own runner; the app has not yet been tested on a Galaxy S26.
