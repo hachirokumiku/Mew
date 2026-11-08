@@ -94,6 +94,45 @@ public final class WobbleMathTest {
             }
             near(position, .3f);
         }
+        JellyZone old = JellyZone.parse(".25,.75,.2");
+        near(old.rx, .2f);
+        near(old.ry, .2f);
+        near(old.angle, 0);
+        check(old.shape == 0, "Old circular zones must retain smooth falloff");
+        JellyZone shaped = new JellyZone(.3f, .4f, .2f);
+        shaped.ry = .1f;
+        shaped.angle = 90;
+        shaped.shape = 2;
+        JellyZone restored = JellyZone.parse(shaped.serialize());
+        near(restored.rx, .2f);
+        near(restored.ry, .1f);
+        near(restored.angle, 90);
+        check(restored.shape == 2, "Zone shape must survive saving");
+        near(restored.normalizedDistance(0, .1f), .5f);
+        near(restored.normalizedDistance(.1f, 0), 1f);
+        near(restored.weight(.1f, 0), 0);
+        restored.shape = 0;
+        float smooth = restored.weight(0, .1f);
+        restored.shape = 1;
+        float broad = restored.weight(0, .1f);
+        restored.shape = 2;
+        float pointed = restored.weight(0, .1f);
+        check(broad >= smooth && smooth > pointed, "Falloff profiles must be distinct");
+        JellyZone jelly = new JellyZone(.5f, .5f, .2f);
+        jelly.impulse(.2f, 0);
+        float largestSquash = 0;
+        for (int i = 0; i < 80; i++) {
+            jelly.step(0, 0, 85, 8, .01f);
+            float w = jelly.weight(.1f, 0);
+            largestSquash = Math.max(largestSquash, Math.abs(jelly.meshX(.1f, 0, w) - w * jelly.dx));
+        }
+        check(largestSquash > .0005f, "Jelly motion must change the zone shape, not just translate it");
+        for (int i = 0; i < 2000; i++) jelly.step(0, 0, 85, 8, .01f);
+        near(jelly.dx, 0);
+        near(jelly.meshX(.1f, 0, jelly.weight(.1f, 0)), 0);
+        boolean invalid = false;
+        try { JellyZone.parse(".5,.5,NaN"); } catch (IllegalArgumentException ex) { invalid = true; }
+        check(invalid, "Non-finite saved zone values must be rejected");
         System.out.println("WobbleMath tests passed");
     }
 }

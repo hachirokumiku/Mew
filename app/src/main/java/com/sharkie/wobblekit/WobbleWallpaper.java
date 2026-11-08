@@ -17,11 +17,12 @@ public class WobbleWallpaper extends WallpaperService {
         private final Handler handler = new Handler();
         private final WobbleView view = new WobbleView(WobbleWallpaper.this);
         private final WobbleMotion motion = new WobbleMotion(WobbleWallpaper.this, view);
+        private boolean visible;
         private final SharedPreferences preferences = getSharedPreferences("MainActivity", 0);
         private final SharedPreferences.OnSharedPreferenceChangeListener physicsListener = (prefs, key) -> {
             if ("strength".equals(key) || "spring".equals(key) || "damping".equals(key)) view.loadPhysics(prefs);
+            if ("zones".equals(key) && visible) handler.post(() -> { if (visible) loadZones(); });
         };
-        private boolean visible;
         private final Runnable draw = this::render;
 
         WEngine() {
@@ -39,13 +40,17 @@ public class WobbleWallpaper extends WallpaperService {
                 if (bitmap == null) Log.w("WobbleWallpaper", "Saved image is unreadable");
             }
             view.load(bitmap);
-            String saved = prefs.getString("zones", "");
+            loadZones();
+        }
+
+        private void loadZones() {
+            view.zones.clear();
+            String saved = preferences.getString("zones", "");
             for (String item : saved.split(";")) {
-                String[] parts = item.split(",");
-                if (parts.length == 3) {
+                if (!item.isEmpty()) {
                     try {
-                        view.zones.add(new WobbleView.Zone(Float.parseFloat(parts[0]), Float.parseFloat(parts[1]), Float.parseFloat(parts[2])));
-                    } catch (NumberFormatException ex) {
+                        view.zones.add(JellyZone.parse(item));
+                    } catch (IllegalArgumentException ex) {
                         Log.w("WobbleWallpaper", "Invalid saved zone", ex);
                     }
                 }
@@ -76,6 +81,7 @@ public class WobbleWallpaper extends WallpaperService {
             if (visible) {
                 loadSettings();
                 motion.start();
+                view.resetClock();
                 render();
             } else {
                 motion.stop();

@@ -11,20 +11,18 @@ import android.view.View;
 import java.util.ArrayList;
 
 public class WobbleView extends View {
-    public static class Zone {
-        float x, y, r, dx, dy, vx, vy;
-        Zone(float x, float y, float r) { this.x = x; this.y = y; this.r = r; }
-    }
-
     public Bitmap picture;
-    public final ArrayList<Zone> zones = new ArrayList<>();
+    public final ArrayList<JellyZone> zones = new ArrayList<>();
     public boolean editing = true;
     private final Paint paint = new Paint(3);
     private final Paint overlay = new Paint(3);
     private long last = System.nanoTime();
     private float previousX, previousY, tiltX, tiltY;
-    private Zone selected;
+    private JellyZone selected;
+    private JellyZone activeZone;
     private boolean resizing;
+    private float handleDirection;
+    private int activePointerId = MotionEvent.INVALID_POINTER_ID;
     private float strength = 1f, spring = 85f, damping = 12f;
 
     public WobbleView(Context context) {
@@ -36,11 +34,24 @@ public class WobbleView extends View {
         picture = bitmap;
         zones.clear();
         selected = null;
+        activeZone = null;
         invalidate();
     }
 
+    void resetClock() { last = System.nanoTime(); }
+
     public void addZone() {
-        zones.add(new Zone(.5f, .5f, .17f));
+        activeZone = new JellyZone(.5f, .5f, .17f);
+        zones.add(activeZone);
+        invalidate();
+    }
+
+    JellyZone activeZone() { return activeZone; }
+
+    void removeActiveZone() {
+        if (activeZone != null) zones.remove(activeZone);
+        activeZone = null;
+        selected = null;
         invalidate();
     }
 
@@ -57,10 +68,9 @@ public class WobbleView extends View {
 
     public void applyMotion(float x, float y, float dt) {
         if (editing || picture == null) return;
-        float aspect = (float) picture.getWidth() / picture.getHeight();
-        for (Zone z : zones) {
-            z.vx -= WobbleMath.motionImpulse(x, z.r, strength, dt);
-            z.vy += WobbleMath.motionImpulse(y, z.r, strength, dt) * aspect;
+        for (JellyZone z : zones) {
+            z.impulse(-WobbleMath.motionImpulse(x, z.radius(), strength, dt),
+                    WobbleMath.motionImpulse(y, z.radius(), strength, dt));
         }
     }
 
@@ -71,14 +81,11 @@ public class WobbleView extends View {
         float aspect = picture == null ? 1f : (float) picture.getWidth() / picture.getHeight();
         int steps = Math.max(1, (int) Math.ceil(dt / .01f));
         float step = dt / steps;
-        for (Zone z : zones) {
-            float targetX = editing ? 0 : WobbleMath.targetX(tiltX, z.r, strength);
-            float targetY = editing ? 0 : WobbleMath.targetY(tiltY, z.r, aspect, strength);
+        for (JellyZone z : zones) {
+            float targetX = editing ? 0 : WobbleMath.targetX(tiltX, z.radius(), strength);
+            float targetY = editing ? 0 : WobbleMath.targetY(tiltY, z.radius(), aspect, strength) / aspect;
             for (int i = 0; i < steps; i++) {
-                z.vx = WobbleMath.velocity(z.dx, z.vx, targetX, spring, damping, step);
-                z.vy = WobbleMath.velocity(z.dy, z.vy, targetY, spring, damping, step);
-                z.dx += z.vx * step;
-                z.dy += z.vy * step;
+                z.step(targetX, targetY, spring, damping, step);
             }
         }
         invalidate();
@@ -96,18 +103,18 @@ public class WobbleView extends View {
         float scale = Math.min((float) getWidth() / picture.getWidth(), (float) getHeight() / picture.getHeight());
         float iw = picture.getWidth() * scale, ih = picture.getHeight() * scale;
         float ox = (getWidth() - iw) / 2, oy = (getHeight() - ih) / 2;
-        int nx = 40, ny = 60;
+        int nx = 80, ny = 120;
         float[] vertices = new float[(nx + 1) * (ny + 1) * 2];
         int index = 0;
         for (int y = 0; y <= ny; y++) for (int x = 0; x <= nx; x++) {
             float u = x / (float) nx, v = y / (float) ny;
             float px = u * iw, py = v * ih;
-            for (Zone z : zones) {
-                float dist = WobbleMath.distance(u, v, z.x, z.y, ih / iw);
-                if (dist < z.r) {
-                    float f = 1 - dist / z.r;
-                    px += z.dx * iw * f * f;
-                    py += z.dy * ih * f * f;
+            for (JellyZone z : zones) {
+                float zx = u - z.x, zy = (v - z.y) * ih / iw;
+                float weight = z.weight(zx, zy);
+                if (weight > 0) {
+                    px += z.meshX(zx, zy, weight) * iw;
+                    py += z.meshY(zx, zy, weight) * iw;
                 }
             }
             vertices[index++] = px;
@@ -122,11 +129,16 @@ public class WobbleView extends View {
             overlay.setColor(0xff73e7ff);
             overlay.setStyle(Paint.Style.STROKE);
             overlay.setStrokeWidth(2 * density);
-            for (Zone z : zones) {
-                canvas.drawCircle(z.x * iw, z.y * ih, z.r * iw, overlay);
+            for (JellyZone z : zones) {
+                overlay.setColor(z == activeZone ? Color.WHITE : 0xff73e7ff);
+                canvas.save();
+                canvas.rotate(z.angle, z.x * iw, z.y * ih);
+                canvas.drawOval((z.x-z.rx)*iw, z.y*ih-z.ry*iw, (z.x+z.rx)*iw, z.y*ih+z.ry*iw, overlay);
                 overlay.setStyle(Paint.Style.FILL);
-                canvas.drawCircle(WobbleMath.handleX(z.x, z.r) * iw, z.y * ih, 6 * density, overlay);
+                float handle = z.handleDirection(ih / iw) * z.rx;
+                canvas.drawCircle((z.x+handle)*iw, z.y*ih, 6 * density, overlay);
                 overlay.setStyle(Paint.Style.STROKE);
+                canvas.restore();
             }
         }
         canvas.restore();
@@ -140,40 +152,51 @@ public class WobbleView extends View {
         float v = (event.getY() - (getHeight() - ih) / 2) / ih;
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                activePointerId = event.getPointerId(0);
                 selected = null;
                 resizing = false;
                 float best = Float.MAX_VALUE;
                 if (editing) {
                     float hitRadius = 24 * getResources().getDisplayMetrics().density / iw;
                     for (int i = zones.size() - 1; i >= 0; i--) {
-                        Zone z = zones.get(i);
-                        float d = WobbleMath.distance(u, v, WobbleMath.handleX(z.x, z.r), z.y, ih / iw);
-                        float centerDistance = WobbleMath.distance(u, v, z.x, z.y, ih / iw);
-                        if (d <= hitRadius && d < centerDistance && d < best) { selected = z; best = d; resizing = true; }
+                        JellyZone z = zones.get(i);
+                        float zx = u-z.x, zy = (v-z.y)*ih/iw;
+                        float handle = z.handleDirection(ih / iw) * z.rx;
+                        float hx = z.localX(zx, zy)-handle, hy = z.localY(zx, zy);
+                        float d = (float)Math.hypot(hx, hy);
+                        float centerDistance = (float)Math.hypot(zx, zy);
+                        if (d <= hitRadius && d < centerDistance && d < best) { selected = z; best = d; resizing = true; handleDirection = Math.signum(handle); }
                     }
                 }
                 if (selected == null) {
                     best = Float.MAX_VALUE;
                     for (int i = zones.size() - 1; i >= 0; i--) {
-                        Zone z = zones.get(i);
-                        float d = WobbleMath.distance(u, v, z.x, z.y, ih / iw);
-                        if (d < z.r && d < best) { selected = z; best = d; }
+                        JellyZone z = zones.get(i);
+                        float d = z.normalizedDistance(u-z.x, (v-z.y)*ih/iw);
+                        if (d < 1 && d < best) { selected = z; best = d; }
                     }
                 }
                 previousX = u;
                 previousY = v;
+                if (editing && selected != null) { activeZone = selected; invalidate(); }
                 return true;
             case MotionEvent.ACTION_MOVE:
+                int pointerIndex = event.findPointerIndex(activePointerId);
+                if (pointerIndex < 0) return true;
+                u = (event.getX(pointerIndex) - (getWidth() - iw) / 2) / iw;
+                v = (event.getY(pointerIndex) - (getHeight() - ih) / 2) / ih;
                 if (selected != null) {
                     float dx = u - previousX, dy = v - previousY;
                     if (resizing) {
-                        selected.r = WobbleMath.radius(WobbleMath.distance(u, v, selected.x, selected.y, ih / iw));
+                        float local = selected.localX(u-selected.x, (v-selected.y)*ih/iw) * handleDirection;
+                        float newRadius = WobbleMath.radius(local);
+                        selected.ry = WobbleMath.radius(selected.ry * newRadius / selected.rx);
+                        selected.rx = newRadius;
                     } else if (editing) {
                         selected.x = WobbleMath.clamp(selected.x + dx, 0, 1);
                         selected.y = WobbleMath.clamp(selected.y + dy, 0, 1);
                     } else {
-                        selected.vx += dx * 75 * strength;
-                        selected.vy += dy * 75 * strength;
+                        selected.impulse(dx * 35 * strength, dy * ih / iw * 35 * strength);
                     }
                 }
                 previousX = u;
@@ -184,6 +207,14 @@ public class WobbleView extends View {
             case MotionEvent.ACTION_CANCEL:
                 selected = null;
                 resizing = false;
+                activePointerId = MotionEvent.INVALID_POINTER_ID;
+                return true;
+            case MotionEvent.ACTION_POINTER_UP:
+                if (event.getPointerId(event.getActionIndex()) == activePointerId) {
+                    selected = null;
+                    resizing = false;
+                    activePointerId = MotionEvent.INVALID_POINTER_ID;
+                }
                 return true;
             default:
                 return true;
