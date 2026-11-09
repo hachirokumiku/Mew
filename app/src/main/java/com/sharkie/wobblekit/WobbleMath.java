@@ -44,17 +44,9 @@ final class WobbleMath {
         }
     }
 
-    static float targetX(float tiltX, float radius, float strength) {
-        return -clamp(tiltX / GRAVITY, -1, 1) * radius * .18f * strength;
-    }
-
-    static float targetY(float tiltY, float radius, float widthOverHeight, float strength) {
-        return clamp(tiltY / GRAVITY, -1, 1) * radius * .18f * widthOverHeight * strength;
-    }
-
     static float motionImpulse(float acceleration, float radius, float strength, float dt) {
         float normalized = clamp(sensorMotion(acceleration) / GRAVITY, -2, 2);
-        return normalized * radius * 20f * strength * dt;
+        return normalized * radius * 35f * strength * dt;
     }
 
     static float sensorMotion(float acceleration) {

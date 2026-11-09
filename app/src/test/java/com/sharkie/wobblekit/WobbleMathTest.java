@@ -30,9 +30,7 @@ public final class WobbleMathTest {
                         WobbleMath.motionImpulse(filter.linearY, zone.radius(), strength, filter.dt));
                 zone.depthImpulse(filter.linearZ, strength, filter.dt);
             }
-            zone.step(WobbleMath.targetX(filter.gravityX, zone.radius(), strength),
-                    WobbleMath.targetY(filter.gravityY, zone.radius(), 1, strength),
-                    85, 12, .01f);
+            zone.step(85, 12, .01f);
             max = Math.max(max, Math.abs(zone.dx));
             check(Math.abs(zone.dx) <= zone.radius() * .2201f, "Motion must remain compact");
         }
@@ -60,19 +58,15 @@ public final class WobbleMathTest {
         axes(1, -3, 2);
         axes(2, -2, -3);
         axes(3, 3, -2);
-        near(WobbleMath.targetX(2 * WobbleMath.GRAVITY, .2f, 1), -.036f);
-        near(WobbleMath.targetY(-WobbleMath.GRAVITY, .2f, .5f, 1), -.018f);
-        near(WobbleMath.targetX(WobbleMath.GRAVITY, .2f, 0), 0);
-        near(WobbleMath.targetX(WobbleMath.GRAVITY, .2f, 2), -.072f);
         near(WobbleMath.motionImpulse(WobbleMath.GRAVITY, .2f, 0, .02f), 0);
         near(WobbleMath.motionImpulse(WobbleMath.GRAVITY, .2f, 1, .02f),
-                .08f * (WobbleMath.GRAVITY - .15f) / WobbleMath.GRAVITY);
+                .14f * (WobbleMath.GRAVITY - .15f) / WobbleMath.GRAVITY);
         near(WobbleMath.motionImpulse(.1f, .2f, 1, .02f), 0);
         near(WobbleMath.motionImpulse(-.1f, .2f, 1, .02f), 0);
         near(WobbleMath.velocity(0, 0, .1f, 180, 12, .01f), .18f);
         near(WobbleMath.velocity(0, 1, 0, 85, 30, .01f), .7f);
         float position = 0, velocity = 0;
-        float target = WobbleMath.targetX(WobbleMath.GRAVITY, .2f, 1);
+        float target = -.036f;
         for (int i = 0; i < 500; i++) {
             velocity = WobbleMath.velocity(position, velocity, target, 85, 12, .016f);
             position += velocity * .016f;
@@ -89,7 +83,7 @@ public final class WobbleMathTest {
         near(filter.linearY, 0);
         near(filter.dt, 0);
         filter.update(4, WobbleMath.GRAVITY, 0, 1_020_000_000L, 0);
-        check(filter.linearX > 3.8f, "A shake must produce a substantial motion signal");
+        check(filter.linearX > 3.3f, "A shake must produce a substantial motion signal");
         check(WobbleMath.motionImpulse(filter.linearX, .17f, 1, filter.dt) > .02f,
               "A shake must produce a visible spring impulse");
         filter.update(0, WobbleMath.GRAVITY, 0, 1_040_000_000L, 1);
@@ -105,29 +99,14 @@ public final class WobbleMathTest {
         near(filter.linearX, 0);
         near(filter.dt, 0);
         filter.reset();
-        position = velocity = 0;
-        float maxDisplacement = 0;
-        for (int i = 0; i < 100; i++) {
-            float acceleration = i >= 5 && i < 10 ? 5 : 0;
-            filter.update(acceleration, 0, 0, 4_000_000_000L + i * 20_000_000L, 0);
-            velocity -= WobbleMath.motionImpulse(filter.linearX, .17f, 1, filter.dt);
-            float motionTarget = WobbleMath.targetX(filter.gravityX, .17f, 1);
-            for (int j = 0; j < 2; j++) {
-                velocity = WobbleMath.velocity(position, velocity, motionTarget, 85, 12, .01f);
-                position += velocity * .01f;
-                maxDisplacement = Math.max(maxDisplacement, Math.abs(position));
-            }
-        }
-        check(maxDisplacement > .005f, "Simulated phone movement must displace the mesh");
-        filter.reset();
         filter.update(0, 0, WobbleMath.GRAVITY, 6_000_000_000L, 0);
         filter.update(0, 0, WobbleMath.GRAVITY + 4, 6_020_000_000L, 0);
-        check(filter.linearZ > 3.8f, "Forward movement must be detected");
+        check(filter.linearZ > 3.3f, "Forward movement must be detected");
         JellyZone depthZone = new JellyZone(.5f, .5f, .2f);
         depthZone.depthImpulse(filter.linearZ, 1, filter.dt);
         float maxDepthDeformation = 0;
         for (int i = 0; i < 100; i++) {
-            depthZone.step(0, 0, 85, 12, .01f);
+            depthZone.step(85, 12, .01f);
             maxDepthDeformation = Math.max(maxDepthDeformation,
                     Math.abs(depthZone.meshX(.1f, 0, depthZone.weight(.1f, 0))));
         }
@@ -177,19 +156,19 @@ public final class WobbleMathTest {
         jelly.impulse(.2f, 0);
         float largestSquash = 0;
         for (int i = 0; i < 80; i++) {
-            jelly.step(0, 0, 85, 8, .01f);
+            jelly.step(85, 8, .01f);
             float w = jelly.weight(.1f, 0);
             largestSquash = Math.max(largestSquash, Math.abs(jelly.meshX(.1f, 0, w) - w * jelly.dx));
         }
         check(largestSquash > .0005f, "Jelly motion must change the zone shape, not just translate it");
-        for (int i = 0; i < 2000; i++) jelly.step(0, 0, 85, 8, .01f);
+        for (int i = 0; i < 2000; i++) jelly.step(85, 8, .01f);
         near(jelly.dx, 0);
         near(jelly.meshX(.1f, 0, jelly.weight(.1f, 0)), 0);
         jelly = new JellyZone(.5f, .5f, .2f);
         jelly.impulse(.2f, 0);
         float positivePeak = 0, negativePeak = 0, laterMotion = 0;
         for (int i = 0; i < 200; i++) {
-            jelly.step(0, 0, 85, 12, .01f);
+            jelly.step(85, 12, .01f);
             positivePeak = Math.max(positivePeak, jelly.dx);
             negativePeak = Math.min(negativePeak, jelly.dx);
             if (i >= 50 && i < 150) laterMotion = Math.max(laterMotion, Math.abs(jelly.dx));
@@ -203,7 +182,7 @@ public final class WobbleMathTest {
         float previousCenter = 0, maxLag = 0, peak = 0, oppositePeak = 0;
         int crossings = 0;
         for (int i = 0; i < 300; i++) {
-            bounce.step(0, 0, 85, 12, .01f);
+            bounce.step(85, 12, .01f);
             float center = bounce.meshY(0, 0, 1);
             float rim = bounce.meshY(0, .085f, weight) / weight;
             maxLag = Math.max(maxLag, Math.abs(center - rim));
@@ -217,20 +196,29 @@ public final class WobbleMathTest {
         check(crossings >= 4, "Jelly must bounce repeatedly before settling");
         check(maxLag > .0005f, "Interior and outer region must move out of phase");
         JellyZone held = new JellyZone(.5f, .5f, .17f);
-        float heldTarget = WobbleMath.targetX(WobbleMath.GRAVITY * .5f, held.radius(), 1);
-        float minHeld = 0;
-        for (int i = 0; i < 3000; i++) {
-            held.step(heldTarget, 0, 85, 12, .01f);
-            minHeld = Math.min(minHeld, held.dx);
+        MotionFilter heldFilter = new MotionFilter();
+        float tiltPeak = 0, tiltOpposite = 0, biggestSquash = 0;
+        for (int i = 0; i < 1000; i++) {
+            float tilt = i < 10 ? 0 : 4;
+            heldFilter.update(tilt, 0, 8.95f, 20_000_000_000L + i * 10_000_000L, 0);
+            held.impulse(-WobbleMath.motionImpulse(heldFilter.linearX, held.radius(), 1, heldFilter.dt),
+                    WobbleMath.motionImpulse(heldFilter.linearY, held.radius(), 1, heldFilter.dt));
+            held.step(85, 12, .01f);
+            tiltPeak = Math.min(tiltPeak, held.dx);
+            tiltOpposite = Math.max(tiltOpposite, held.dx);
+            float w = held.weight(.085f, 0);
+            biggestSquash = Math.max(biggestSquash, Math.abs(held.meshX(.085f, 0, w) - w * held.dx));
         }
-        check(minHeld < heldTarget * 1.1f, "Tilting must bounce past its resting position");
-        near(held.dx, heldTarget);
-        near(held.meshX(.085f, 0, held.weight(.085f, 0)),
-                heldTarget * held.weight(.085f, 0));
+        check(tiltPeak < -.005f && tiltOpposite > .001f,
+                "Tilting must excite a bounce in both directions: " + tiltPeak + ", " + tiltOpposite);
+        check(biggestSquash > .0005f, "Phone motion must deform the zone instead of only translating it");
+        near(held.dx, 0);
+        near(held.dy, 0);
+        near(held.meshX(.085f, 0, held.weight(.085f, 0)), 0);
         JellyZone noInput = new JellyZone(.5f, .5f, .17f);
         noInput.impulse(0, 0);
         noInput.depthImpulse(5, 0, .02f);
-        for (int i = 0; i < 100; i++) noInput.step(0, 0, 85, 12, .01f);
+        for (int i = 0; i < 100; i++) noInput.step(85, 12, .01f);
         near(noInput.meshX(.085f, 0, noInput.weight(.085f, 0)), 0);
         near(noInput.meshY(0, .085f, noInput.weight(0, .085f)), 0);
         JellyZone narrow = new JellyZone(.5f, .5f, .4f);
@@ -238,7 +226,7 @@ public final class WobbleMathTest {
         narrow.angle = 45;
         narrow.impulse(50, -50);
         for (int i = 0; i < 300; i++) {
-            narrow.step(0, 0, 85, 12, .01f);
+            narrow.step(85, 12, .01f);
             check(Math.hypot(narrow.dx, narrow.dy) <= .00881,
                     "Narrow zones must stay bounded by their shortest dimension");
         }
@@ -246,7 +234,7 @@ public final class WobbleMathTest {
             JellyZone extreme = new JellyZone(.5f, .5f, .2f);
             extreme.impulse(1000, -1000);
             for (int i = 0; i < 5000; i++) {
-                extreme.step(0, 0, spring, damping, .01f);
+                extreme.step(spring, damping, .01f);
                 check(Float.isFinite(extreme.dx) && Float.isFinite(extreme.dy), "Jelly must remain finite");
                 check(Math.hypot(extreme.dx, extreme.dy) <= .04401f, "Jelly displacement must remain bounded");
                 float meshX = extreme.meshX(.1f, 0, extreme.weight(.1f, 0));

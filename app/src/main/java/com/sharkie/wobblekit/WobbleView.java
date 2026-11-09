@@ -19,7 +19,7 @@ public class WobbleView extends View {
     private static final int MESH_WIDTH = 80, MESH_HEIGHT = 120;
     private final float[] vertices = new float[(MESH_WIDTH + 1) * (MESH_HEIGHT + 1) * 2];
     private long last = System.nanoTime();
-    private float previousX, previousY, tiltX, tiltY;
+    private float previousX, previousY;
     private JellyZone selected;
     private JellyZone activeZone;
     private boolean resizing;
@@ -66,11 +66,6 @@ public class WobbleView extends View {
         return (float) Math.hypot(event.getX(a) - event.getX(b), event.getY(a) - event.getY(b));
     }
 
-    public void setTilt(float x, float y) {
-        tiltX = x;
-        tiltY = y;
-    }
-
     public void loadPhysics(SharedPreferences prefs) {
         strength = WobbleMath.clamp(prefs.getInt("strength", 100), 0, 300) / 100f;
         spring = WobbleMath.clamp(prefs.getInt("spring", 85), 20, 180);
@@ -90,14 +85,11 @@ public class WobbleView extends View {
         long now = System.nanoTime();
         float dt = Math.min(.04f, (now - last) / 1e9f);
         last = now;
-        float aspect = picture == null ? 1f : (float) picture.getWidth() / picture.getHeight();
         int steps = Math.max(1, (int) Math.ceil(dt / .01f));
         float step = dt / steps;
         for (JellyZone z : zones) {
-            float targetX = editing ? 0 : WobbleMath.targetX(tiltX, z.radius(), strength);
-            float targetY = editing ? 0 : WobbleMath.targetY(tiltY, z.radius(), aspect, strength) / aspect;
             for (int i = 0; i < steps; i++) {
-                z.step(targetX, targetY, spring, damping, step);
+                z.step(spring, damping, step);
             }
         }
         invalidate();
@@ -125,8 +117,8 @@ public class WobbleView extends View {
                 float distance = z.normalizedDistance(zx, zy);
                 float weight = z.weightAt(distance);
                 if (weight > 0) {
-                    px += z.meshAtX(zx, weight, distance) * iw;
-                    py += z.meshAtY(zy, weight, distance) * iw;
+                    px += z.meshAtX(zx, zy, weight, distance) * iw;
+                    py += z.meshAtY(zx, zy, weight, distance) * iw;
                 }
             }
             vertices[index++] = px;

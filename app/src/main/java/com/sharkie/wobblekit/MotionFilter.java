@@ -21,7 +21,7 @@ final class MotionFilter {
             linearX = linearY = linearZ = dt = 0;
         } else {
             dt = Math.min(elapsed, .05f);
-            float blend = dt / (.8f + dt);
+            float blend = dt / (.12f + dt);
             gravityX += blend * (axes[0] - gravityX);
             gravityY += blend * (axes[1] - gravityY);
             gravityZ += blend * (z - gravityZ);
