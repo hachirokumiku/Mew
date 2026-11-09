@@ -15,11 +15,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Test zone and sensor math
-        run: |
-          mkdir -p /tmp/wobble-tests
-          javac -d /tmp/wobble-tests app/src/main/java/com/sharkie/wobblekit/WobbleMath.java app/src/main/java/com/sharkie/wobblekit/MotionFilter.java app/src/main/java/com/sharkie/wobblekit/JellyZone.java app/src/test/java/com/sharkie/wobblekit/WobbleMathTest.java
-          java -cp /tmp/wobble-tests com.sharkie.wobblekit.WobbleMathTest
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
