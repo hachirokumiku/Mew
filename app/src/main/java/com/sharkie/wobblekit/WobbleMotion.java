@@ -43,9 +43,9 @@ final class WobbleMotion implements SensorEventListener {
 
     @Override public void onSensorChanged(SensorEvent event) {
         if (!listening || event.sensor.getType() != Sensor.TYPE_ACCELEROMETER) return;
-        filter.update(event.values[0], event.values[1], event.timestamp, windows.getDefaultDisplay().getRotation());
+        filter.update(event.values[0], event.values[1], event.values[2], event.timestamp, windows.getDefaultDisplay().getRotation());
         view.setTilt(filter.gravityX, filter.gravityY);
-        view.applyMotion(filter.linearX, filter.linearY, filter.dt);
+        view.applyMotion(filter.linearX, filter.linearY, filter.linearZ, filter.dt);
     }
 
     @Override public void onAccuracyChanged(Sensor sensor, int accuracy) {}

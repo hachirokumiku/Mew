@@ -5,6 +5,7 @@ final class JellyZone {
     int shape;
     float dx, dy, vx, vy;
     private float stretch, stretchVelocity;
+    private float pulse, pulseVelocity;
     private float cosAngle, sinAngle, cachedAngle = Float.NaN;
 
     JellyZone(float x, float y, float radius) {
@@ -71,6 +72,11 @@ final class JellyZone {
         stretchVelocity = WobbleMath.clamp(stretchVelocity + amount, -2f, 2f);
     }
 
+    void depthImpulse(float acceleration, float strength, float dt) {
+        float force = WobbleMath.clamp(acceleration / WobbleMath.GRAVITY, -2f, 2f);
+        pulseVelocity = WobbleMath.clamp(pulseVelocity + force * strength * dt * 12f, -2f, 2f);
+    }
+
     void step(float targetX, float targetY, float spring, float damping, float dt) {
         float stiffness = spring * .5f;
         float drag = damping * .45f;
@@ -101,17 +107,21 @@ final class JellyZone {
         stretch += stretchVelocity * dt;
         if (stretch > .3f) { stretch = .3f; stretchVelocity = Math.min(0, stretchVelocity); }
         if (stretch < -.3f) { stretch = -.3f; stretchVelocity = Math.max(0, stretchVelocity); }
+        pulseVelocity = WobbleMath.velocity(pulse, pulseVelocity, 0, stiffness * .65f, drag * .8f, dt);
+        pulse += pulseVelocity * dt;
+        if (pulse > .3f) { pulse = .3f; pulseVelocity = Math.min(0, pulseVelocity); }
+        if (pulse < -.3f) { pulse = -.3f; pulseVelocity = Math.max(0, pulseVelocity); }
     }
 
     float meshX(float x, float y, float weight) {
         float localX = localX(x, y), localY = localY(x, y);
-        float changeX = localX * stretch, changeY = -localY * stretch;
+        float changeX = localX * (stretch + pulse), changeY = localY * (pulse - stretch);
         return weight * (dx + changeX * cosAngle - changeY * sinAngle);
     }
 
     float meshY(float x, float y, float weight) {
         float localX = localX(x, y), localY = localY(x, y);
-        float changeX = localX * stretch, changeY = -localY * stretch;
+        float changeX = localX * (stretch + pulse), changeY = localY * (pulse - stretch);
         return weight * (dy + changeX * sinAngle + changeY * cosAngle);
     }
 

@@ -21,6 +21,11 @@ public final class WobbleMathTest {
         near(WobbleMath.radius(0), .04f);
         near(WobbleMath.radius(.2f), .2f);
         near(WobbleMath.radius(2), .5f);
+        near(WobbleMath.pinchRadius(.1f, 100, 200), .2f);
+        near(WobbleMath.pinchRadius(.2f, 100, 200), .4f);
+        near(WobbleMath.pinchRadius(.2f, 100, 5), .04f);
+        near(WobbleMath.pinchRadius(.4f, 100, 200), .5f);
+        near(WobbleMath.pinchRadius(.2f, 0, 100), .2f);
         check(WobbleMath.imageSampleSize(2048, 1024, 2048) == 1, "Small images must not be reduced");
         check(WobbleMath.imageSampleSize(2049, 2048, 2048) == 2, "Oversized images need downsampling");
         check(WobbleMath.imageSampleSize(12000, 8000, 2048) == 8, "Large images must fit the texture limit");
@@ -53,24 +58,24 @@ public final class WobbleMathTest {
         }
         near(position, 0);
         MotionFilter filter = new MotionFilter();
-        filter.update(0, WobbleMath.GRAVITY, 1_000_000_000L, 0);
+        filter.update(0, WobbleMath.GRAVITY, 0, 1_000_000_000L, 0);
         near(filter.linearX, 0);
         near(filter.linearY, 0);
         near(filter.dt, 0);
-        filter.update(4, WobbleMath.GRAVITY, 1_020_000_000L, 0);
+        filter.update(4, WobbleMath.GRAVITY, 0, 1_020_000_000L, 0);
         check(filter.linearX > 3.8f, "A shake must produce a substantial motion signal");
         check(WobbleMath.motionImpulse(filter.linearX, .17f, 1, filter.dt) > .035f,
               "A shake must produce a visible spring impulse");
-        filter.update(0, WobbleMath.GRAVITY, 1_040_000_000L, 1);
+        filter.update(0, WobbleMath.GRAVITY, 0, 1_040_000_000L, 1);
         near(filter.linearX, 0);
         near(filter.linearY, 0);
         near(filter.dt, 0);
         near(filter.gravityX, -WobbleMath.GRAVITY);
-        filter.update(0, 0, 2_000_000_000L, 1);
+        filter.update(0, 0, 0, 2_000_000_000L, 1);
         near(filter.linearX, 0);
         near(filter.dt, 0);
         filter.reset();
-        filter.update(4, 3, 3_000_000_000L, 0);
+        filter.update(4, 3, 0, 3_000_000_000L, 0);
         near(filter.linearX, 0);
         near(filter.dt, 0);
         filter.reset();
@@ -78,7 +83,7 @@ public final class WobbleMathTest {
         float maxDisplacement = 0;
         for (int i = 0; i < 100; i++) {
             float acceleration = i >= 5 && i < 10 ? 5 : 0;
-            filter.update(acceleration, 0, 4_000_000_000L + i * 20_000_000L, 0);
+            filter.update(acceleration, 0, 0, 4_000_000_000L + i * 20_000_000L, 0);
             velocity -= WobbleMath.motionImpulse(filter.linearX, .17f, 1, filter.dt);
             float motionTarget = WobbleMath.targetX(filter.gravityX, .17f, 1);
             for (int j = 0; j < 2; j++) {
@@ -88,6 +93,20 @@ public final class WobbleMathTest {
             }
         }
         check(maxDisplacement > .005f, "Simulated phone movement must displace the mesh");
+        filter.reset();
+        filter.update(0, 0, WobbleMath.GRAVITY, 6_000_000_000L, 0);
+        filter.update(0, 0, WobbleMath.GRAVITY + 4, 6_020_000_000L, 0);
+        check(filter.linearZ > 3.8f, "Forward movement must be detected");
+        JellyZone depthZone = new JellyZone(.5f, .5f, .2f);
+        depthZone.depthImpulse(filter.linearZ, 1, filter.dt);
+        float maxDepthDeformation = 0;
+        for (int i = 0; i < 100; i++) {
+            depthZone.step(0, 0, 85, 12, .01f);
+            maxDepthDeformation = Math.max(maxDepthDeformation,
+                    Math.abs(depthZone.meshX(.1f, 0, depthZone.weight(.1f, 0))));
+        }
+        check(maxDepthDeformation > .0005f,
+              "Forward movement must create visible deformation");
         for (int spring : new int[] {20, 180}) for (int damping : new int[] {2, 30}) {
             position = 0;
             velocity = 0;

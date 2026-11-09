@@ -25,6 +25,10 @@ public class WobbleView extends View {
     private boolean resizing;
     private float handleDirection;
     private int activePointerId = MotionEvent.INVALID_POINTER_ID;
+    private int secondaryPointerId = MotionEvent.INVALID_POINTER_ID;
+    private float pinchDistance, pinchRx, pinchRy;
+    private float downX, downY;
+    private boolean moved;
     private float strength = 1f, spring = 85f, damping = 12f;
 
     public WobbleView(Context context) {
@@ -56,6 +60,12 @@ public class WobbleView extends View {
         invalidate();
     }
 
+    private float pointerDistance(MotionEvent event, int first, int second) {
+        int a = event.findPointerIndex(first), b = event.findPointerIndex(second);
+        if (a < 0 || b < 0) return 0;
+        return (float) Math.hypot(event.getX(a) - event.getX(b), event.getY(a) - event.getY(b));
+    }
+
     public void setTilt(float x, float y) {
         tiltX = x;
         tiltY = y;
@@ -67,11 +77,12 @@ public class WobbleView extends View {
         damping = WobbleMath.clamp(prefs.getInt("damping", 12), 2, 30);
     }
 
-    public void applyMotion(float x, float y, float dt) {
+    public void applyMotion(float x, float y, float depth, float dt) {
         if (editing || picture == null) return;
         for (JellyZone z : zones) {
             z.impulse(-WobbleMath.motionImpulse(x, z.radius(), strength, dt),
                     WobbleMath.motionImpulse(y, z.radius(), strength, dt));
+            z.depthImpulse(depth, strength, dt);
         }
     }
 
@@ -153,6 +164,10 @@ public class WobbleView extends View {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 activePointerId = event.getPointerId(0);
+                secondaryPointerId = MotionEvent.INVALID_POINTER_ID;
+                downX = event.getX();
+                downY = event.getY();
+                moved = false;
                 selected = null;
                 resizing = false;
                 float best = Float.MAX_VALUE;
@@ -180,14 +195,29 @@ public class WobbleView extends View {
                 previousY = v;
                 if (editing && selected != null) { activeZone = selected; invalidate(); }
                 return true;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                if (editing && selected != null && secondaryPointerId == MotionEvent.INVALID_POINTER_ID) {
+                    secondaryPointerId = event.getPointerId(event.getActionIndex());
+                    pinchDistance = pointerDistance(event, activePointerId, secondaryPointerId);
+                    pinchRx = selected.rx;
+                    pinchRy = selected.ry;
+                    resizing = false;
+                }
+                return true;
             case MotionEvent.ACTION_MOVE:
                 int pointerIndex = event.findPointerIndex(activePointerId);
                 if (pointerIndex < 0) return true;
+                if (Math.hypot(event.getX(pointerIndex) - downX, event.getY(pointerIndex) - downY)
+                        > 8 * getResources().getDisplayMetrics().density) moved = true;
                 u = (event.getX(pointerIndex) - (getWidth() - iw) / 2) / iw;
                 v = (event.getY(pointerIndex) - (getHeight() - ih) / 2) / ih;
                 if (selected != null) {
                     float dx = u - previousX, dy = v - previousY;
-                    if (resizing) {
+                    if (editing && secondaryPointerId != MotionEvent.INVALID_POINTER_ID && pinchDistance > 0) {
+                        float distance = pointerDistance(event, activePointerId, secondaryPointerId);
+                        selected.rx = WobbleMath.pinchRadius(pinchRx, pinchDistance, distance);
+                        selected.ry = WobbleMath.pinchRadius(pinchRy, pinchDistance, distance);
+                    } else if (resizing) {
                         float local = selected.localX(u-selected.x, (v-selected.y)*ih/iw) * handleDirection;
                         float newRadius = WobbleMath.radius(local);
                         selected.ry = WobbleMath.radius(selected.ry * newRadius / selected.rx);
@@ -205,14 +235,28 @@ public class WobbleView extends View {
                 return true;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
+                if (event.getActionMasked() == MotionEvent.ACTION_UP && !editing && selected != null && !moved) {
+                    selected.impulse(0, selected.radius() * strength * 2f);
+                }
                 selected = null;
                 resizing = false;
                 activePointerId = MotionEvent.INVALID_POINTER_ID;
+                secondaryPointerId = MotionEvent.INVALID_POINTER_ID;
                 return true;
             case MotionEvent.ACTION_POINTER_UP:
-                if (event.getPointerId(event.getActionIndex()) == activePointerId) {
+                int lifted = event.getPointerId(event.getActionIndex());
+                if (lifted == secondaryPointerId) {
+                    secondaryPointerId = MotionEvent.INVALID_POINTER_ID;
+                } else if (lifted == activePointerId && secondaryPointerId != MotionEvent.INVALID_POINTER_ID) {
+                    activePointerId = secondaryPointerId;
+                    secondaryPointerId = MotionEvent.INVALID_POINTER_ID;
+                    int remaining = event.findPointerIndex(activePointerId);
+                    if (remaining >= 0) {
+                        previousX = (event.getX(remaining) - (getWidth() - iw) / 2) / iw;
+                        previousY = (event.getY(remaining) - (getHeight() - ih) / 2) / ih;
+                    }
+                } else if (lifted == activePointerId) {
                     selected = null;
-                    resizing = false;
                     activePointerId = MotionEvent.INVALID_POINTER_ID;
                 }
                 return true;

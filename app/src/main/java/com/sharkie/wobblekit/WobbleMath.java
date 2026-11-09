@@ -11,6 +11,11 @@ final class WobbleMath {
         return clamp(value, .04f, .5f);
     }
 
+    static float pinchRadius(float originalRadius, float originalDistance, float currentDistance) {
+        if (originalDistance <= 0 || currentDistance <= 0) return originalRadius;
+        return radius(originalRadius * currentDistance / originalDistance);
+    }
+
     static int imageSampleSize(int width, int height, int maximum) {
         int sample = 1;
         while (((long) width + sample - 1) / sample > maximum ||
