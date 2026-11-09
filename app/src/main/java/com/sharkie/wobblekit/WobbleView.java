@@ -122,10 +122,11 @@ public class WobbleView extends View {
             float px = u * iw, py = v * ih;
             for (JellyZone z : zones) {
                 float zx = u - z.x, zy = (v - z.y) * ih / iw;
-                float weight = z.weight(zx, zy);
+                float distance = z.normalizedDistance(zx, zy);
+                float weight = z.weightAt(distance);
                 if (weight > 0) {
-                    px += z.meshX(zx, zy, weight) * iw;
-                    py += z.meshY(zx, zy, weight) * iw;
+                    px += z.meshAtX(zx, weight, distance) * iw;
+                    py += z.meshAtY(zy, weight, distance) * iw;
                 }
             }
             vertices[index++] = px;

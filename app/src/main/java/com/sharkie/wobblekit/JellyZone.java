@@ -4,7 +4,7 @@ final class JellyZone {
     float x, y, rx, ry, angle;
     int shape;
     float dx, dy, vx, vy;
-    private float stretch, stretchVelocity;
+    private float rimX, rimY, rimVx, rimVy;
     private float pulse, pulseVelocity;
     private float cosAngle, sinAngle, cachedAngle = Float.NaN;
 
@@ -51,7 +51,10 @@ final class JellyZone {
     }
 
     float weight(float x, float y) {
-        float distance = normalizedDistance(x, y);
+        return weightAt(normalizedDistance(x, y));
+    }
+
+    float weightAt(float distance) {
         if (distance >= 1) return 0;
         float remaining = 1 - distance;
         if (shape == 1) return remaining;
@@ -68,8 +71,6 @@ final class JellyZone {
             vx *= limit / speed;
             vy *= limit / speed;
         }
-        float amount = Math.min(.35f, (float) Math.hypot(x, y) / radius() * .25f);
-        stretchVelocity = WobbleMath.clamp(stretchVelocity + amount, -2f, 2f);
     }
 
     void depthImpulse(float acceleration, float strength, float dt) {
@@ -79,7 +80,7 @@ final class JellyZone {
 
     void step(float targetX, float targetY, float spring, float damping, float dt) {
         float stiffness = spring * .5f;
-        float drag = damping * .45f;
+        float drag = damping * .3f;
         float limit = radius() * .65f;
         float targetLength = (float) Math.hypot(targetX, targetY);
         if (targetLength > limit) {
@@ -100,13 +101,21 @@ final class JellyZone {
                 vy -= outwardVelocity * dy / limit;
             }
         }
-        float speed = (float) Math.hypot(vx, vy) / radius();
-        float stretchTarget = Math.min(.3f, speed * .12f);
-        stretchVelocity = WobbleMath.velocity(stretch, stretchVelocity, stretchTarget,
-                stiffness * .65f, drag * .8f, dt);
-        stretch += stretchVelocity * dt;
-        if (stretch > .3f) { stretch = .3f; stretchVelocity = Math.min(0, stretchVelocity); }
-        if (stretch < -.3f) { stretch = -.3f; stretchVelocity = Math.max(0, stretchVelocity); }
+        // A slower, coupled rim lets the interior and edge rebound out of phase.
+        rimVx = WobbleMath.velocity(rimX, rimVx, dx, stiffness * .6f, drag * .85f, dt);
+        rimVy = WobbleMath.velocity(rimY, rimVy, dy, stiffness * .6f, drag * .85f, dt);
+        rimX += rimVx * dt;
+        rimY += rimVy * dt;
+        float rimLength = (float) Math.hypot(rimX, rimY);
+        if (rimLength > limit) {
+            rimX *= limit / rimLength;
+            rimY *= limit / rimLength;
+            float outwardVelocity = (rimVx * rimX + rimVy * rimY) / limit;
+            if (outwardVelocity > 0) {
+                rimVx -= outwardVelocity * rimX / limit;
+                rimVy -= outwardVelocity * rimY / limit;
+            }
+        }
         pulseVelocity = WobbleMath.velocity(pulse, pulseVelocity, 0, stiffness * .65f, drag * .8f, dt);
         pulse += pulseVelocity * dt;
         if (pulse > .3f) { pulse = .3f; pulseVelocity = Math.min(0, pulseVelocity); }
@@ -114,15 +123,19 @@ final class JellyZone {
     }
 
     float meshX(float x, float y, float weight) {
-        float localX = localX(x, y), localY = localY(x, y);
-        float changeX = localX * (stretch + pulse), changeY = localY * (pulse - stretch);
-        return weight * (dx + changeX * cosAngle - changeY * sinAngle);
+        return meshAtX(x, weight, normalizedDistance(x, y));
+    }
+
+    float meshAtX(float x, float weight, float distance) {
+        return weight * (dx + .7f * distance * (rimX - dx) + x * pulse);
     }
 
     float meshY(float x, float y, float weight) {
-        float localX = localX(x, y), localY = localY(x, y);
-        float changeX = localX * (stretch + pulse), changeY = localY * (pulse - stretch);
-        return weight * (dy + changeX * sinAngle + changeY * cosAngle);
+        return meshAtY(y, weight, normalizedDistance(x, y));
+    }
+
+    float meshAtY(float y, float weight, float distance) {
+        return weight * (dy + .7f * distance * (rimY - dy) + y * pulse);
     }
 
     String serialize() {

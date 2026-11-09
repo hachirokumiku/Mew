@@ -9,7 +9,7 @@ Open this folder in Android Studio with Android SDK 35, then Build > Build APK(s
 - Place and drag wobble regions; resize using a handle or pinch, and adjust each zone's width, height, rotation and falloff
 - Toggle between editor and tap-, drag- and accelerometer-responsive spring simulation
 - Tune strength, springiness and damping for all zones
-- Soft, bouncy jelly-like stretch and squash with bitmap-mesh deformation
+- Soft, bouncy jelly motion with a delayed outer region and bitmap-mesh deformation
 - Hardware-accelerated mesh drawing in the editor and live wallpaper
 - Live wallpaper service with touch and accelerometer input
 
