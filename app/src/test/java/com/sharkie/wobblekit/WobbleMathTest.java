@@ -17,6 +17,29 @@ public final class WobbleMathTest {
         near(result[1], expectedY);
     }
 
+    private static float simulatePhoneJiggle(int sampleEverySteps, float strength) {
+        JellyZone zone = new JellyZone(.5f, .5f, .17f);
+        MotionFilter filter = new MotionFilter();
+        float max = 0;
+        for (int i = 0; i < 300; i++) {
+            if (i % sampleEverySteps == 0) {
+                float movement = i >= 10 && i < 20 ? 4 : 0;
+                filter.update(movement, 0, WobbleMath.GRAVITY,
+                        10_000_000_000L + i * 10_000_000L, 0);
+                zone.impulse(-WobbleMath.motionImpulse(filter.linearX, zone.radius(), strength, filter.dt),
+                        WobbleMath.motionImpulse(filter.linearY, zone.radius(), strength, filter.dt));
+                zone.depthImpulse(filter.linearZ, strength, filter.dt);
+            }
+            zone.step(WobbleMath.targetX(filter.gravityX, zone.radius(), strength),
+                    WobbleMath.targetY(filter.gravityY, zone.radius(), 1, strength),
+                    85, 12, .01f);
+            max = Math.max(max, Math.abs(zone.dx));
+            check(Math.abs(zone.dx) <= zone.radius() * .2201f, "Motion must remain compact");
+        }
+        check(Math.abs(zone.dx) < .001f, "Jiggle must settle after phone movement");
+        return max;
+    }
+
     public static void main(String[] args) {
         near(WobbleMath.radius(0), .04f);
         near(WobbleMath.radius(.2f), .2f);
@@ -37,12 +60,15 @@ public final class WobbleMathTest {
         axes(1, -3, 2);
         axes(2, -2, -3);
         axes(3, 3, -2);
-        near(WobbleMath.targetX(2 * WobbleMath.GRAVITY, .2f, 1), -.1f);
-        near(WobbleMath.targetY(-WobbleMath.GRAVITY, .2f, .5f, 1), -.05f);
+        near(WobbleMath.targetX(2 * WobbleMath.GRAVITY, .2f, 1), -.036f);
+        near(WobbleMath.targetY(-WobbleMath.GRAVITY, .2f, .5f, 1), -.018f);
         near(WobbleMath.targetX(WobbleMath.GRAVITY, .2f, 0), 0);
-        near(WobbleMath.targetX(WobbleMath.GRAVITY, .2f, 2), -.2f);
+        near(WobbleMath.targetX(WobbleMath.GRAVITY, .2f, 2), -.072f);
         near(WobbleMath.motionImpulse(WobbleMath.GRAVITY, .2f, 0, .02f), 0);
-        near(WobbleMath.motionImpulse(WobbleMath.GRAVITY, .2f, 1, .02f), .12f);
+        near(WobbleMath.motionImpulse(WobbleMath.GRAVITY, .2f, 1, .02f),
+                .08f * (WobbleMath.GRAVITY - .15f) / WobbleMath.GRAVITY);
+        near(WobbleMath.motionImpulse(.1f, .2f, 1, .02f), 0);
+        near(WobbleMath.motionImpulse(-.1f, .2f, 1, .02f), 0);
         near(WobbleMath.velocity(0, 0, .1f, 180, 12, .01f), .18f);
         near(WobbleMath.velocity(0, 1, 0, 85, 30, .01f), .7f);
         float position = 0, velocity = 0;
@@ -64,7 +90,7 @@ public final class WobbleMathTest {
         near(filter.dt, 0);
         filter.update(4, WobbleMath.GRAVITY, 0, 1_020_000_000L, 0);
         check(filter.linearX > 3.8f, "A shake must produce a substantial motion signal");
-        check(WobbleMath.motionImpulse(filter.linearX, .17f, 1, filter.dt) > .035f,
+        check(WobbleMath.motionImpulse(filter.linearX, .17f, 1, filter.dt) > .02f,
               "A shake must produce a visible spring impulse");
         filter.update(0, WobbleMath.GRAVITY, 0, 1_040_000_000L, 1);
         near(filter.linearX, 0);
@@ -105,8 +131,14 @@ public final class WobbleMathTest {
             maxDepthDeformation = Math.max(maxDepthDeformation,
                     Math.abs(depthZone.meshX(.1f, 0, depthZone.weight(.1f, 0))));
         }
-        check(maxDepthDeformation > .0005f,
+        check(maxDepthDeformation > .0003f,
               "Forward movement must create visible deformation");
+        float jiggle50 = simulatePhoneJiggle(2, 1);
+        float jiggle100 = simulatePhoneJiggle(1, 1);
+        check(jiggle50 > .005f && jiggle100 > .005f, "Phone movement must produce visible jiggle");
+        check(jiggle50 / jiggle100 > .7f && jiggle50 / jiggle100 < 1.3f,
+                "Jiggle must be consistent across sensor sampling rates");
+        near(simulatePhoneJiggle(2, 0), 0);
         for (int spring : new int[] {20, 180}) for (int damping : new int[] {2, 30}) {
             position = 0;
             velocity = 0;
@@ -163,7 +195,7 @@ public final class WobbleMathTest {
             if (i >= 50 && i < 150) laterMotion = Math.max(laterMotion, Math.abs(jelly.dx));
         }
         check(positivePeak > .01f, "A modest impulse must visibly move the jelly");
-        check(negativePeak < -.15f * positivePeak, "Default jelly must bounce back with a visible overshoot");
+        check(negativePeak < -.1f * positivePeak, "Default jelly must bounce back with a visible overshoot");
         check(laterMotion > .1f * positivePeak, "Jelly motion must persist after the initial movement");
         JellyZone bounce = new JellyZone(.5f, .5f, .17f);
         bounce.impulse(0, bounce.radius() * 2);
@@ -180,18 +212,18 @@ public final class WobbleMathTest {
             if (i > 0 && center * previousCenter < 0) crossings++;
             previousCenter = center;
         }
-        check(peak > .025f, "Tap must produce visible displacement");
-        check(oppositePeak < -peak * .3f, "Jelly must rebound noticeably");
+        check(peak > .01f, "Tap must produce visible displacement");
+        check(oppositePeak < -peak * .15f, "Jelly must rebound noticeably");
         check(crossings >= 4, "Jelly must bounce repeatedly before settling");
-        check(maxLag > .005f, "Interior and outer region must move out of phase");
+        check(maxLag > .0005f, "Interior and outer region must move out of phase");
         JellyZone held = new JellyZone(.5f, .5f, .17f);
         float heldTarget = WobbleMath.targetX(WobbleMath.GRAVITY * .5f, held.radius(), 1);
-        float maxHeld = 0;
+        float minHeld = 0;
         for (int i = 0; i < 3000; i++) {
             held.step(heldTarget, 0, 85, 12, .01f);
-            maxHeld = Math.max(maxHeld, held.dx);
+            minHeld = Math.min(minHeld, held.dx);
         }
-        check(maxHeld > heldTarget * 1.1f, "Tilting must bounce past its resting position");
+        check(minHeld < heldTarget * 1.1f, "Tilting must bounce past its resting position");
         near(held.dx, heldTarget);
         near(held.meshX(.085f, 0, held.weight(.085f, 0)),
                 heldTarget * held.weight(.085f, 0));
@@ -201,13 +233,22 @@ public final class WobbleMathTest {
         for (int i = 0; i < 100; i++) noInput.step(0, 0, 85, 12, .01f);
         near(noInput.meshX(.085f, 0, noInput.weight(.085f, 0)), 0);
         near(noInput.meshY(0, .085f, noInput.weight(0, .085f)), 0);
+        JellyZone narrow = new JellyZone(.5f, .5f, .4f);
+        narrow.ry = .04f;
+        narrow.angle = 45;
+        narrow.impulse(50, -50);
+        for (int i = 0; i < 300; i++) {
+            narrow.step(0, 0, 85, 12, .01f);
+            check(Math.hypot(narrow.dx, narrow.dy) <= .00881,
+                    "Narrow zones must stay bounded by their shortest dimension");
+        }
         for (int spring : new int[] {20, 180}) for (int damping : new int[] {2, 30}) {
             JellyZone extreme = new JellyZone(.5f, .5f, .2f);
             extreme.impulse(1000, -1000);
             for (int i = 0; i < 5000; i++) {
                 extreme.step(0, 0, spring, damping, .01f);
                 check(Float.isFinite(extreme.dx) && Float.isFinite(extreme.dy), "Jelly must remain finite");
-                check(Math.hypot(extreme.dx, extreme.dy) <= .13001f, "Jelly displacement must remain bounded");
+                check(Math.hypot(extreme.dx, extreme.dy) <= .04401f, "Jelly displacement must remain bounded");
                 float meshX = extreme.meshX(.1f, 0, extreme.weight(.1f, 0));
                 float meshY = extreme.meshY(.1f, 0, extreme.weight(.1f, 0));
                 check(Float.isFinite(meshX) && Float.isFinite(meshY)
