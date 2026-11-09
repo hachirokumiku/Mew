@@ -23,6 +23,7 @@ public class WobbleView extends View {
     private float previousX, previousY;
     private JellyZone selected;
     private JellyZone activeZone;
+    private Runnable selectionListener;
     private boolean resizing;
     private float handleDirection;
     private int activePointerId = MotionEvent.INVALID_POINTER_ID;
@@ -30,7 +31,7 @@ public class WobbleView extends View {
     private float pinchDistance, pinchRx, pinchRy;
     private float downX, downY;
     private boolean moved;
-    private float strength = 1f, spring = 85f, damping = 12f;
+    private float strength = PhysicsDefaults.STRENGTH / 100f, spring = PhysicsDefaults.SPRING, damping = PhysicsDefaults.DAMPING;
     private boolean crop;
     private float zoom = 1f, frameX = .5f, frameY = .5f;
     private float previewAspect;
@@ -44,6 +45,7 @@ public class WobbleView extends View {
         zones.clear();
         selected = null;
         activeZone = null;
+        notifySelectionChanged();
         invalidate();
     }
 
@@ -55,15 +57,36 @@ public class WobbleView extends View {
         activeZone = new JellyZone(WobbleMath.clamp(frame.imageX(viewport.centerX()), 0, 1),
                 WobbleMath.clamp(frame.imageY(viewport.centerY()), 0, 1), .17f);
         zones.add(activeZone);
+        notifySelectionChanged();
         invalidate();
     }
 
     JellyZone activeZone() { return activeZone; }
 
+    void setSelectionListener(Runnable listener) { selectionListener = listener; }
+
+    private void notifySelectionChanged() {
+        if (selectionListener != null) selectionListener.run();
+    }
+
+    void showZonePreview(WobbleView source, JellyZone zone) {
+        picture = source.picture;
+        zones.clear();
+        zones.addAll(source.zones);
+        activeZone = zone;
+        crop = source.crop;
+        zoom = source.zoom;
+        frameX = source.frameX;
+        frameY = source.frameY;
+        previewAspect = source.previewAspect;
+        invalidate();
+    }
+
     void removeActiveZone() {
         if (activeZone != null) zones.remove(activeZone);
         activeZone = null;
         selected = null;
+        notifySelectionChanged();
         invalidate();
     }
 
@@ -74,9 +97,9 @@ public class WobbleView extends View {
     }
 
     public void loadPhysics(SharedPreferences prefs) {
-        strength = WobbleMath.clamp(prefs.getInt("strength", 100), 0, 300) / 100f;
-        spring = WobbleMath.clamp(prefs.getInt("spring", 85), 20, 180);
-        damping = WobbleMath.clamp(prefs.getInt("damping", 12), 2, 30);
+        strength = WobbleMath.clamp(prefs.getInt("strength", PhysicsDefaults.STRENGTH), 0, 300) / 100f;
+        spring = WobbleMath.clamp(prefs.getInt("spring", PhysicsDefaults.SPRING), 20, 180);
+        damping = WobbleMath.clamp(prefs.getInt("damping", PhysicsDefaults.DAMPING), 2, 30);
     }
 
     void setPreviewAspect(float aspect) { previewAspect = aspect; invalidate(); }
@@ -181,6 +204,12 @@ public class WobbleView extends View {
                 overlay.setStyle(Paint.Style.FILL);
                 float handle = z.handleDirection(ih / iw) * z.rx;
                 canvas.drawCircle((z.x+handle)*iw, z.y*ih, 6 * density, overlay);
+                if (z == activeZone) {
+                    canvas.drawCircle(z.x * iw, z.y * ih, 3 * density, overlay);
+                    overlay.setStyle(Paint.Style.STROKE);
+                    canvas.drawLine(z.x * iw - 9 * density, z.y * ih, z.x * iw + 9 * density, z.y * ih, overlay);
+                    canvas.drawLine(z.x * iw, z.y * ih - 9 * density, z.x * iw, z.y * ih + 9 * density, overlay);
+                }
                 overlay.setStyle(Paint.Style.STROKE);
                 canvas.restore();
             }
@@ -230,7 +259,7 @@ public class WobbleView extends View {
                 }
                 previousX = u;
                 previousY = v;
-                if (editing && selected != null) { activeZone = selected; invalidate(); }
+                if (editing && selected != null) { activeZone = selected; notifySelectionChanged(); invalidate(); }
                 return true;
             case MotionEvent.ACTION_POINTER_DOWN:
                 if (editing && selected != null && secondaryPointerId == MotionEvent.INVALID_POINTER_ID) {
