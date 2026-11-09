@@ -7,6 +7,7 @@ Open this folder in Android Studio with Android SDK 35, then Build > Build APK(s
 ## Features
 - Android image picker with an app-private copy for the wallpaper
 - Place and drag wobble regions; resize using a handle or pinch, and adjust each zone's width, height, rotation and falloff
+- Non-destructive wallpaper framing with fit, crop, zoom and horizontal/vertical positioning
 - Toggle between editor and tap-, drag- and accelerometer-responsive spring simulation
 - Tune strength, springiness and damping for all zones
 - Accelerometer-responsive jiggle with elastic squash and bitmap-mesh deformation
@@ -18,6 +19,8 @@ Prototype, not yet tested on physical Galaxy S26. Accelerometer input depends on
 
 ## Use
 Choose an image, tap **+ Zone**, then drag a zone to move it or pinch it or drag its dot to resize it. Select a zone and tap **Shape** to adjust width and height (radii as a percentage of image width), rotation, and smooth, broad or pointed falloff; **Delete** removes the selected zone. Tap **Preview** and tilt, move, tap or drag the image to test the jelly motion. **Tune** adjusts strength (0–300%), springiness and damping for all zones; tap **Apply** to save or **Reset** to restore defaults. Tap **Wallpaper** to open the live-wallpaper preview and apply it. Zones, shapes and tuning are saved for the wallpaper.
+
+Scroll down to reach every tool, including **Set wallpaper**. **Crop & zoom** can fill the screen and adjust the framing; turn off **Fill screen** to fit the whole image. Changes are non-destructive and leave zones in their original image coordinates. The editor uses the phone's screen proportions, but wallpaper framing can vary if the launcher uses a differently sized surface. Choose **Apply** to save framing or **Cancel** to discard it.
 
 Lower springiness and damping in **Tune** for a slower, longer-lasting wobble. Existing tuning is retained. The accelerometer responds to movement and the image returns to its original shape when the phone is held still.
 

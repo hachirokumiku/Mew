@@ -20,6 +20,7 @@ public class WobbleWallpaper extends WallpaperService {
         private final SharedPreferences preferences = getSharedPreferences("MainActivity", 0);
         private final SharedPreferences.OnSharedPreferenceChangeListener physicsListener = (prefs, key) -> {
             if ("strength".equals(key) || "spring".equals(key) || "damping".equals(key)) view.loadPhysics(prefs);
+            if (key != null && key.startsWith("frame")) view.loadFrame(prefs);
             if ("zones".equals(key) && visible) handler.post(() -> { if (visible) loadZones(); });
         };
         private final Runnable draw = this::render;
@@ -33,6 +34,7 @@ public class WobbleWallpaper extends WallpaperService {
         private void loadSettings() {
             SharedPreferences prefs = preferences;
             view.loadPhysics(prefs);
+            view.loadFrame(prefs);
             Bitmap bitmap = null;
             if (prefs.getBoolean("hasImage", false)) {
                 bitmap = ImageLoader.load(new File(getFilesDir(), MainActivity.IMAGE_FILE));

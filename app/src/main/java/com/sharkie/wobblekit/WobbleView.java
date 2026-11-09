@@ -6,6 +6,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.RectF;
 import android.view.MotionEvent;
 import android.view.View;
 import java.util.ArrayList;
@@ -30,6 +31,9 @@ public class WobbleView extends View {
     private float downX, downY;
     private boolean moved;
     private float strength = 1f, spring = 85f, damping = 12f;
+    private boolean crop;
+    private float zoom = 1f, frameX = .5f, frameY = .5f;
+    private float previewAspect;
 
     public WobbleView(Context context) {
         super(context);
@@ -46,7 +50,10 @@ public class WobbleView extends View {
     void resetClock() { last = System.nanoTime(); }
 
     public void addZone() {
-        activeZone = new JellyZone(.5f, .5f, .17f);
+        RectF viewport = viewport();
+        ImageFrame frame = imageFrame(viewport);
+        activeZone = new JellyZone(WobbleMath.clamp(frame.imageX(viewport.centerX()), 0, 1),
+                WobbleMath.clamp(frame.imageY(viewport.centerY()), 0, 1), .17f);
         zones.add(activeZone);
         invalidate();
     }
@@ -70,6 +77,36 @@ public class WobbleView extends View {
         strength = WobbleMath.clamp(prefs.getInt("strength", 100), 0, 300) / 100f;
         spring = WobbleMath.clamp(prefs.getInt("spring", 85), 20, 180);
         damping = WobbleMath.clamp(prefs.getInt("damping", 12), 2, 30);
+    }
+
+    void setPreviewAspect(float aspect) { previewAspect = aspect; invalidate(); }
+
+    void loadFrame(SharedPreferences prefs) {
+        setFrame(prefs.getBoolean("frameCrop", false), prefs.getInt("frameZoom", 100),
+                prefs.getInt("frameX", 50), prefs.getInt("frameY", 50));
+    }
+
+    void setFrame(boolean crop, int zoom, int x, int y) {
+        this.crop = crop;
+        this.zoom = WobbleMath.clamp(zoom, 100, 300) / 100f;
+        frameX = WobbleMath.clamp(x, 0, 100) / 100f;
+        frameY = WobbleMath.clamp(y, 0, 100) / 100f;
+        invalidate();
+    }
+
+    private RectF viewport() {
+        float width = getWidth(), height = getHeight();
+        if (previewAspect > 0 && width > 0 && height > 0) {
+            if (width / height > previewAspect) width = height * previewAspect;
+            else height = width / previewAspect;
+        }
+        return new RectF((getWidth() - width) / 2, (getHeight() - height) / 2,
+                (getWidth() + width) / 2, (getHeight() + height) / 2);
+    }
+
+    private ImageFrame imageFrame(RectF viewport) {
+        return new ImageFrame(picture.getWidth(), picture.getHeight(), viewport.left, viewport.top,
+                viewport.width(), viewport.height(), crop, zoom, frameX, frameY);
     }
 
     public void applyMotion(float x, float y, float depth, float dt) {
@@ -104,9 +141,11 @@ public class WobbleView extends View {
             canvas.drawText("Pick an image :3", 25, getHeight() / 2f, paint);
             return;
         }
-        float scale = Math.min((float) getWidth() / picture.getWidth(), (float) getHeight() / picture.getHeight());
-        float iw = picture.getWidth() * scale, ih = picture.getHeight() * scale;
-        float ox = (getWidth() - iw) / 2, oy = (getHeight() - ih) / 2;
+        RectF viewport = viewport();
+        if (viewport.width() <= 0 || viewport.height() <= 0) return;
+        ImageFrame frame = imageFrame(viewport);
+        float iw = frame.width, ih = frame.height;
+        float ox = frame.left, oy = frame.top;
         int nx = MESH_WIDTH, ny = MESH_HEIGHT;
         int index = 0;
         for (int y = 0; y <= ny; y++) for (int x = 0; x <= nx; x++) {
@@ -125,6 +164,7 @@ public class WobbleView extends View {
             vertices[index++] = py;
         }
         canvas.save();
+        canvas.clipRect(viewport);
         canvas.translate(ox, oy);
         paint.setColor(Color.WHITE);
         canvas.drawBitmapMesh(picture, nx, ny, vertices, 0, null, 0, paint);
@@ -150,12 +190,16 @@ public class WobbleView extends View {
 
     @Override public boolean onTouchEvent(MotionEvent event) {
         if (picture == null || getWidth() == 0 || getHeight() == 0) return true;
-        float scale = Math.min((float) getWidth() / picture.getWidth(), (float) getHeight() / picture.getHeight());
-        float iw = picture.getWidth() * scale, ih = picture.getHeight() * scale;
-        float u = (event.getX() - (getWidth() - iw) / 2) / iw;
-        float v = (event.getY() - (getHeight() - ih) / 2) / ih;
+        RectF viewport = viewport();
+        if (viewport.width() <= 0 || viewport.height() <= 0) return true;
+        ImageFrame frame = imageFrame(viewport);
+        float iw = frame.width, ih = frame.height;
+        float u = frame.imageX(event.getX());
+        float v = frame.imageY(event.getY());
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                if (!viewport.contains(event.getX(), event.getY())) return true;
+                if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
                 activePointerId = event.getPointerId(0);
                 secondaryPointerId = MotionEvent.INVALID_POINTER_ID;
                 downX = event.getX();
@@ -202,8 +246,8 @@ public class WobbleView extends View {
                 if (pointerIndex < 0) return true;
                 if (Math.hypot(event.getX(pointerIndex) - downX, event.getY(pointerIndex) - downY)
                         > 8 * getResources().getDisplayMetrics().density) moved = true;
-                u = (event.getX(pointerIndex) - (getWidth() - iw) / 2) / iw;
-                v = (event.getY(pointerIndex) - (getHeight() - ih) / 2) / ih;
+                u = frame.imageX(event.getX(pointerIndex));
+                v = frame.imageY(event.getY(pointerIndex));
                 if (selected != null) {
                     float dx = u - previousX, dy = v - previousY;
                     if (editing && secondaryPointerId != MotionEvent.INVALID_POINTER_ID && pinchDistance > 0) {
@@ -245,8 +289,8 @@ public class WobbleView extends View {
                     secondaryPointerId = MotionEvent.INVALID_POINTER_ID;
                     int remaining = event.findPointerIndex(activePointerId);
                     if (remaining >= 0) {
-                        previousX = (event.getX(remaining) - (getWidth() - iw) / 2) / iw;
-                        previousY = (event.getY(remaining) - (getHeight() - ih) / 2) / ih;
+                        previousX = frame.imageX(event.getX(remaining));
+                        previousY = frame.imageY(event.getY(remaining));
                     }
                 } else if (lifted == activePointerId) {
                     selected = null;
